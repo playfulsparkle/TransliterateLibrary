@@ -4,12 +4,12 @@ using System.Collections.Generic;
 namespace PlayfulSparkle
 {
     /// <summary>
-    /// The <c>Mappings</c> class provides a collection of default character mappings or representations.
+    /// The <c>DefaultMappings</c> class provides a collection of default character mappings or representations.
     /// </summary>
-    internal class Mappings
+    internal class DefaultMappings
     {
         /// <summary>
-        /// A static dictionary that stores default character mappings as key-value pairs.
+        /// A static dictionary that stores 1818 default character mappings as key-value pairs.
         /// Both keys and values are strings. The dictionary uses ordinal string comparison,
         /// meaning comparisons are case-sensitive and based on the Unicode code points of the characters.
         /// </summary>

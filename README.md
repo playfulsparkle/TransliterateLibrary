@@ -4,7 +4,7 @@
 
 The library is designed to process complex Unicode input in a consistent and idempotent manner. It supports:
 - Full control over normalization granularity (canonical vs compatibility, composition vs decomposition),
-- Multi-pass mapping resolution for both standard character sets and emoji/smiley code points,
+- Multi-pass mapping resolution for both standard character sets and emoji code points,
 - On-the-fly integration of user-defined mapping dictionaries,
 - Surrogate pair decoding for code points beyond the Basic Multilingual Plane,
 - Post-normalization filtering to remove diacritics and combining marks for ASCII-safe output.
@@ -17,7 +17,7 @@ Ideal for applications requiring language-agnostic preprocessing such as SEO san
 
 - - Full Unicode normalization support, including NFD (Decompose), NFC (Compose), NFKC (Compatibility Compose), and NFKD (Compatibility Decompose) normalization forms
 - Transliteration of accented characters, diacritics, and complex Unicode sequences (e.g., ligatures, non-ASCII characters) to simplified ASCII representations
-- Smiley and emoji sequence replacement based on pre-defined Unicode mappings for consistent transformation
+- Emoji sequence replacement based on pre-defined Unicode mappings for consistent transformation
 - Efficient handling of multi-codepoint sequences, such as emojis and other combined graphemes, ensuring correct encoding and substitution
 - Removal of non-spacing marks (diacritics) after normalization for producing clean, ASCII-compatible strings
 - Support for customizable character-to-character mappings via user-defined dictionaries for project-specific transliteration needs
@@ -33,7 +33,7 @@ Ideal for applications requiring language-agnostic preprocessing such as SEO san
 The `Decompose` method is used to transliterate and normalize an input string based on a specified Unicode normalization form. It processes the string by applying custom character mappings (if provided) and default mappings for complex characters (e.g., emoji and Unicode sequences). The method can be used to decompose composed characters into their base forms or apply other normalization forms like composition or compatibility normalization.
 
 ```csharp
-public static string Decompose(string str, Normalization? normalization = null, Dictionary<string, string> customMapping = null)
+public static string Decompose(string str, Normalization normalization, bool useDefaultMapping = true, Dictionary<string, string> customMapping = null)
 ```
 
 **Parameters:**
@@ -44,6 +44,7 @@ public static string Decompose(string str, Normalization? normalization = null, 
 	- **Normalization.Compose:** Combines characters into composed characters (NFC).
 	- **Normalization.CompatibilityCompose:** Applies compatibility decomposition followed by composition (NFKC).
 	- **Normalization.CompatibilityDecompose:** Applies compatibility decomposition followed by decomposition (NFKD).
+* **useDefaultMapping (default true):** Indicates whether to use the default character mappings.
 * **customMapping (optional):** A dictionary of custom character mappings to apply before the default mappings. Keys should be Unicode character sequences as strings, and values should be their replacement strings.
 
 **Returns:**
@@ -65,7 +66,7 @@ Console.WriteLine(result);
 The `DecomposeAsync` method is an asynchronous version of the `Decompose` method. It runs the transliteration and normalization process in a separate task to avoid blocking the calling thread, which is useful in scenarios where you need to process large strings or perform the operation without affecting the responsiveness of your application.
 
 ```csharp
-public static async Task<string> DecomposeAsync(string str, Normalization? normalization = null, Dictionary<string, string> customMapping = null)
+public static async Task<string> DecomposeAsync(string str, Normalization normalization, bool useDefaultMapping = true, Dictionary<string, string> customMapping = null)
 ```
 
 **Parameters:**
@@ -76,6 +77,7 @@ public static async Task<string> DecomposeAsync(string str, Normalization? norma
 	- **Normalization.Compose:** Combines characters into composed characters (NFC).
 	- **Normalization.CompatibilityCompose:** Applies compatibility decomposition followed by composition (NFKC).
 	- **Normalization.CompatibilityDecompose:** Applies compatibility decomposition followed by decomposition (NFKD).
+* **useDefaultMapping (default true):** Indicates whether to use the default character mappings.
 * **customMapping (optional):** A dictionary of custom character mappings to apply before the default mappings. Keys should be Unicode character sequences as strings, and values should be their replacement strings.
 
 **Returns:**
@@ -92,38 +94,6 @@ var result = await Transliterate.DecomposeAsync(input, Transliterate.Normalizati
 Console.WriteLine(result);
 ```
 
-### PreprocessDictionary
-
-The `PreprocessDictionary` method is used to process a dictionary where keys are Unicode notations (e.g., `"U+XXXX"` or `"U+XXXX U+YYYY"`) and convert them into actual Unicode characters.
-
-```csharp
-public static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
-```
-
-**Parameters:**
-
-* **source:** The input dictionary where keys are in Unicode notation (e.g., `"U+1F642"`).
-
-**Returns:**
-
-A new dictionary where the keys are actual Unicode characters represented by the notation in the input dictionary.
-
-**Example:**
-
-```csharp
-Dictionary<string, string> unicodeMapping = new Dictionary<string, string>
-{
-    { "U+1F642", "😊" },
-    { "U+1F60D", "😍" }
-};
-
-var processedDictionary = Transliterate.PreprocessDictionary(unicodeMapping);
-foreach (var entry in processedDictionary)
-{
-    Console.WriteLine($"Unicode: {entry.Key}, Replacement: {entry.Value}");
-}
-```
-
 ---
 
 ## Known Issues
@@ -133,6 +103,13 @@ foreach (var entry in processedDictionary)
 ---
 
 ## Release Notes
+
+### 0.0.13
+
+* **New Option: `useDefaultMapping`:** Added a `useDefaultMapping` option (defaults to `true`) to enable or disable the built-in default mapping.
+* **Internal Refinement:** The `PreprocessDictionary` method is now private for improved code maintainability.
+* **Terminology Update:** Renamed "Smiley mapping" to "Emoji mapping."
+* **Terminology Update:** Renamed "Mapping" to "Default mapping."
 
 ### 0.0.12
 
@@ -179,7 +156,7 @@ foreach (var entry in processedDictionary)
 ### 0.0.3
 
 * Implemented core functionality for the **Playful Sparkle: Transliterate Library** extension for Visual Studio.
-* Added Emoji and smiley sequence replacement based on pre-defined Unicode mappings.
+* Added Emoji replacement based on pre-defined Unicode mappings.
 * Added default mappings for complex characters (e.g., ligatures, non-ASCII characters) to simplified ASCII representations.
 
 ### 0.0.2

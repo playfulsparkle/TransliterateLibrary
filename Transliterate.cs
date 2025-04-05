@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,16 +14,16 @@ namespace PlayfulSparkle
     public class Transliterate
     {
         /// <summary>
-        /// A dictionary mapping Unicode representations of smileys to their replacement strings.
+        /// A dictionary mapping Unicode representations of emojis to their replacement strings.
         /// This dictionary is initialized during the class's static initialization.
         /// </summary>
-        private static Dictionary<string, string> smileyUnicodeToReplacement = new Dictionary<string, string>();
+        private static Dictionary<string, string> emojiUnicodeToReplacement = new Dictionary<string, string>();
 
         /// <summary>
         /// A dictionary mapping Unicode representations of various characters or character sequences to their replacement strings.
         /// This dictionary is initialized during the class's static initialization.
         /// </summary>
-        private static Dictionary<string, string> mappingsUnicodeToReplacement = new Dictionary<string, string>();
+        private static Dictionary<string, string> defaultMappingsUnicodeToReplacement = new Dictionary<string, string>();
 
         /// <summary>
         /// Defines the different Unicode normalization forms that can be applied to a string.
@@ -48,31 +49,37 @@ namespace PlayfulSparkle
         }
 
         /// <summary>
-        /// Initializes the <see cref="smileyUnicodeToReplacement"/> and <see cref="mappingsUnicodeToReplacement"/> dictionaries
-        /// by preprocessing data from the <c>Smiley.chars</c> and <c>Mappings.chars</c> (not shown) respectively.
+        /// Initializes the <see cref="emojiUnicodeToReplacement"/> and <see cref="defaultMappingsUnicodeToReplacement"/> dictionaries
+        /// by preprocessing data from the <c>Emoji.chars</c> and <c>DefaultMappings.chars</c> (not shown) respectively.
         /// This static constructor is called only once when the class is first accessed.
         /// </summary>
         static Transliterate()
         {
-            smileyUnicodeToReplacement = PreprocessDictionary(Smiley.chars); // Assuming Smiley.chars is accessible
+            emojiUnicodeToReplacement = PreprocessDictionary(Emoji.chars); // Assuming Emoji.chars is accessible
 
-            mappingsUnicodeToReplacement = PreprocessDictionary(Mappings.chars); // Assuming Mappings.chars is accessible
+            defaultMappingsUnicodeToReplacement = PreprocessDictionary(DefaultMappings.chars); // Assuming DefaultMappings.chars is accessible
         }
 
         /// <summary>
         /// Transliterates and normalizes the input string based on the specified normalization form and optional custom mappings.
         /// </summary>
         /// <param name="str">The input string to be processed.</param>
-        /// <param name="normalization">An optional Unicode normalization form to apply. If <c>null</c>, no normalization is performed after the mappings.</param>
+        /// <param name="normalization">The desired Unicode normalization form to apply.</param>
+        /// <param name="useDefaultMapping">Indicates whether to use the default character mappings.</param>
         /// <param name="customMapping">An optional dictionary containing custom character or sequence mappings to be applied before the default mappings.
         /// The keys of this dictionary should be Unicode character sequences (as strings), and the values should be their replacement strings.</param>
         /// <returns>The transliterated and normalized string.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown if the provided <paramref name="normalization"/> value is not a valid member of the <see cref="Normalization"/> enum.</exception>
-        public static string Decompose(string str, Normalization? normalization = null, Dictionary<string, string> customMapping = null)
+        public static string Decompose(
+            string str,
+            Normalization normalization,
+            bool useDefaultMapping = true,
+            Dictionary<string, string> customMapping = null
+        )
         {
             if (string.IsNullOrWhiteSpace(str))
             {
-                throw new ArgumentNullException(nameof(str), "Input string cannot be null or empty.");
+                throw new ArgumentException(nameof(str), "Input string cannot be null or empty.");
             }
 
             if (!IsValidUnicodeString(str))
@@ -80,7 +87,7 @@ namespace PlayfulSparkle
                 throw new ArgumentOutOfRangeException(nameof(str), "Input string contains invalid Unicode characters.");
             }
 
-            NormalizationForm? normalizationForm = null;
+            NormalizationForm normalizationForm = NormalizationForm.FormD;
 
             switch (normalization)
             {
@@ -97,6 +104,13 @@ namespace PlayfulSparkle
                     normalizationForm = NormalizationForm.FormKD;
                     break;
             }
+
+
+            if (!useDefaultMapping && customMapping == null)
+            {
+                return Normalize(str, normalizationForm);
+            }
+
 
             // First pass - handle both emoji sequences and complex character mappings
             StringBuilder firstPassResult = new StringBuilder();
@@ -122,7 +136,7 @@ namespace PlayfulSparkle
 
                             found = true;
                         }
-                        else if (mappingsUnicodeToReplacement.TryGetValue(candidateSequence, out string mappingReplacement))
+                        else if (useDefaultMapping && defaultMappingsUnicodeToReplacement.TryGetValue(candidateSequence, out string mappingReplacement))
                         {
                             firstPassResult.Append(mappingReplacement);
 
@@ -130,9 +144,9 @@ namespace PlayfulSparkle
 
                             found = true;
                         }
-                        else if (smileyUnicodeToReplacement.TryGetValue(candidateSequence, out string smileyReplacement))
+                        else if (useDefaultMapping && emojiUnicodeToReplacement.TryGetValue(candidateSequence, out string emojiReplacement))
                         {
-                            firstPassResult.Append(smileyReplacement);
+                            firstPassResult.Append(emojiReplacement);
 
                             idx += len;
 
@@ -150,15 +164,15 @@ namespace PlayfulSparkle
 
                     string unicodeKey = $"U+{(int)chr:X4}";
 
-                    // Try to find in Mappings dictionary by Unicode notation
-                    if (Mappings.chars.TryGetValue(unicodeKey, out string mappingReplacement)) // Assuming Mappings.chars is accessible
+                    // Try to find in DefaultMappings dictionary by Unicode notation
+                    if (useDefaultMapping && DefaultMappings.chars.TryGetValue(unicodeKey, out string mappingReplacement)) // Assuming DefaultMappings.chars is accessible
                     {
                         firstPassResult.Append(mappingReplacement);
                     }
-                    // Try to find in Smiley dictionary by Unicode notation
-                    else if (Smiley.chars.TryGetValue(unicodeKey, out string smileyReplacement)) // Assuming Smiley.chars is accessible
+                    // Try to find in Emoji dictionary by Unicode notation
+                    else if (useDefaultMapping && Emoji.chars.TryGetValue(unicodeKey, out string emojiReplacement)) // Assuming Emoji.chars is accessible
                     {
-                        firstPassResult.Append(smileyReplacement);
+                        firstPassResult.Append(emojiReplacement);
                     }
                     else
                     {
@@ -170,13 +184,41 @@ namespace PlayfulSparkle
                 }
             }
 
-            // Now apply normalization to the result
-            string normalizedResult = firstPassResult.ToString();
+           return Normalize(firstPassResult.ToString(), normalizationForm);
+        }
 
-            if (normalizationForm is NormalizationForm)
-            {
-                normalizedResult = normalizedResult.Normalize(normalizationForm.Value);
-            }
+        /// <summary>
+        /// Asynchronously transliterates and normalizes the input string based on the specified normalization form and optional custom mappings.
+        /// This method runs the decomposition process in a separate task to avoid blocking the calling thread.
+        /// </summary>
+        /// <param name="str">The input string to be processed.</param>
+        /// <param name="normalization">The desired Unicode normalization form to apply.</param>
+        /// <param name="useDefaultMapping">Indicates whether to use the default character mappings.</param>
+        /// <param name="customMapping">An optional dictionary containing custom character or sequence mappings to be applied before the default mappings.
+        /// The keys of this dictionary should be Unicode character sequences (as strings), and the values should be their replacement strings.</param>
+        /// <returns>A <see cref="Task{String}"/> that represents the asynchronous operation, containing the transliterated and normalized string.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown if the provided <paramref name="normalization"/> value is not a valid member of the <see cref="Normalization"/> enum.</exception>
+        public static async Task<string> DecomposeAsync(
+            string str,
+            Normalization normalization,
+            bool useDefaultMapping = true,
+            Dictionary<string, string> customMapping = null
+        )
+        {
+            return await Task.Run(() => Decompose(str, normalization, useDefaultMapping, customMapping));
+        }
+
+        /// <summary>
+        /// Normalizes the input string according to the specified Unicode normalization form and then removes any non-spacing combining marks.
+        /// This process is useful for tasks like text comparison or preparing text for indexing where diacritics or other combining marks should be ignored.
+        /// </summary>
+        /// <param name="str">The input string to be normalized and processed.</param>
+        /// <param name="normalizationForm">The Unicode normalization form to apply. Common forms include NFC, NFD, NFKC, and NFKD.</param>
+        /// <returns>A new string that is normalized according to the specified form and has all non-spacing combining marks removed.</returns>
+        private static string Normalize(string str, NormalizationForm normalizationForm)
+        {
+            // Now apply normalization to the result
+            string normalizedResult = str.Normalize(normalizationForm);
 
             // Remove combining marks after normalization
             StringBuilder finalResult = new StringBuilder();
@@ -193,30 +235,12 @@ namespace PlayfulSparkle
         }
 
         /// <summary>
-        /// Asynchronously transliterates and normalizes the input string based on the specified normalization form and optional custom mappings.
-        /// This method runs the decomposition process in a separate task to avoid blocking the calling thread.
-        /// </summary>
-        /// <param name="str">The input string to be processed.</param>
-        /// <param name="normalization">The desired Unicode normalization form to apply.</param>
-        /// <param name="customMapping">An optional dictionary containing custom character or sequence mappings to be applied before the default mappings.
-        /// The keys of this dictionary should be Unicode character sequences (as strings), and the values should be their replacement strings.</param>
-        /// <returns>A <see cref="Task{String}"/> that represents the asynchronous operation, containing the transliterated and normalized string.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown if the provided <paramref name="normalization"/> value is not a valid member of the <see cref="Normalization"/> enum.</exception>
-        public static async Task<string> DecomposeAsync(string str, Normalization normalization, Dictionary<string, string> customMapping = null)
-        {
-            return await Task.Run(() =>
-            {
-                return Decompose(str, normalization, customMapping); // Call the existing Decompose method
-            });
-        }
-
-        /// <summary>
         /// Preprocesses a dictionary by converting Unicode notation (e.g., "U+XXXX" or "U+XXXX U+YYYY") in the keys
         /// to their corresponding actual Unicode characters.
         /// </summary>
         /// <param name="source">The input dictionary where keys are in Unicode notation.</param>
         /// <returns>A new dictionary where the keys are the actual Unicode characters represented by the notation in the input dictionary.</returns>
-        public static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
+        private static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
 

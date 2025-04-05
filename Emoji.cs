@@ -4,12 +4,12 @@ using System.Collections.Generic;
 namespace PlayfulSparkle
 {
     /// <summary>
-    /// The <c>Smiley</c> class provides a collection of smiley characters or representations.
+    /// The <c>Emoji</c> class provides a collection of emoji characters or representations.
     /// </summary>
-    internal class Smiley
+    internal class Emoji
     {
         /// <summary>
-        /// A static dictionary that stores smiley representations as key-value pairs.
+        /// A static dictionary that stores 1910 emoji representations as key-value pairs.
         /// Both keys and values are strings. The dictionary uses ordinal string comparison,
         /// meaning comparisons are case-sensitive and based on the Unicode code points of the characters.
         /// </summary>
