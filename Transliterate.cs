@@ -99,11 +99,6 @@ namespace PlayfulSparkle
                     throw new ArgumentOutOfRangeException(nameof(normalization), normalization, null);
             }
 
-            if (customMapping != null)
-            {
-                customMapping = PreprocessDictionary(customMapping);
-            }
-
             // First pass - handle both emoji sequences and complex character mappings
             StringBuilder firstPassResult = new StringBuilder();
 
@@ -217,7 +212,7 @@ namespace PlayfulSparkle
         /// </summary>
         /// <param name="source">The input dictionary where keys are in Unicode notation.</param>
         /// <returns>A new dictionary where the keys are the actual Unicode characters represented by the notation in the input dictionary.</returns>
-        private static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
+        public static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
 
