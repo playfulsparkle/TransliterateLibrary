@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace PlayfulSparkle
 {
     /// <summary>
-    /// Provides functionality to transliterate and normalize strings, handling complex character mappings and emoji.
+    /// Provides functionality to transliterate and normalize strings.
     /// </summary>
     public class Transliterate
     {
@@ -62,24 +62,24 @@ namespace PlayfulSparkle
         /// Transliterates and normalizes the input string based on the specified normalization form and optional custom mappings.
         /// </summary>
         /// <param name="str">The input string to be processed.</param>
-        /// <param name="normalization">The desired Unicode normalization form to apply.</param>
+        /// <param name="normalization">An optional Unicode normalization form to apply. If <c>null</c>, no normalization is performed after the mappings.</param>
         /// <param name="customMapping">An optional dictionary containing custom character or sequence mappings to be applied before the default mappings.
         /// The keys of this dictionary should be Unicode character sequences (as strings), and the values should be their replacement strings.</param>
         /// <returns>The transliterated and normalized string.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown if the provided <paramref name="normalization"/> value is not a valid member of the <see cref="Normalization"/> enum.</exception>
-        public static string Decompose(string str, Normalization normalization, Dictionary<string, string> customMapping = null)
+        public static string Decompose(string str, Normalization? normalization = null, Dictionary<string, string> customMapping = null)
         {
             if (string.IsNullOrWhiteSpace(str))
             {
-                return str;
+                throw new ArgumentNullException(nameof(str), "Input string cannot be null or empty.");
             }
 
             if (!IsValidUnicodeString(str))
             {
-                return str;
+                throw new ArgumentOutOfRangeException(nameof(str), "Input string contains invalid Unicode characters.");
             }
 
-            NormalizationForm normalizationForm;
+            NormalizationForm? normalizationForm = null;
 
             switch (normalization)
             {
@@ -95,8 +95,6 @@ namespace PlayfulSparkle
                 case Normalization.CompatibilityDecompose:
                     normalizationForm = NormalizationForm.FormKD;
                     break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(normalization), normalization, null);
             }
 
             // First pass - handle both emoji sequences and complex character mappings
@@ -172,7 +170,12 @@ namespace PlayfulSparkle
             }
 
             // Now apply normalization to the result
-            string normalizedResult = firstPassResult.ToString().Normalize(normalizationForm);
+            string normalizedResult = firstPassResult.ToString();
+
+            if (normalizationForm is NormalizationForm)
+            {
+                normalizedResult = normalizedResult.Normalize(normalizationForm.Value);
+            }
 
             // Remove combining marks after normalization
             StringBuilder finalResult = new StringBuilder();
@@ -271,18 +274,33 @@ namespace PlayfulSparkle
         /// </returns>
         private static bool IsValidUnicodeString(string str)
         {
-            // Check if all characters in the string are valid Unicode characters
-            foreach (var chr in str)
+            for (int idx = 0; idx < str.Length; idx++)
             {
-                // Check if character is a valid Unicode character (skip control characters)
+                char chr = str[idx];
+
+                // Check for lone surrogates (invalid Unicode)
+                if (char.IsHighSurrogate(chr))
+                {
+                    // High surrogate must be followed by a low surrogate
+                    if (idx + 1 >= str.Length || !char.IsLowSurrogate(str[idx + 1]))
+                    {
+                        return false; // Lone high surrogate
+                    }
+                    idx++; // Skip the next character (already checked as part of the surrogate pair)
+                }
+                else if (char.IsLowSurrogate(chr))
+                {
+                    // Low surrogate must be preceded by a high surrogate
+                    return false; // Lone low surrogate
+                }
+
+                // Optional: Check for control characters (original behavior)
                 if (CharUnicodeInfo.GetUnicodeCategory(chr) == UnicodeCategory.Control)
                 {
                     return false;
                 }
             }
-
             return true;
         }
-
     }
 }

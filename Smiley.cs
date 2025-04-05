@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Diagnostics;
-using System.Drawing;
-using System.IO;
-using System.Reflection;
-using System.Text.RegularExpressions;
-using System.Xml.Linq;
 
 namespace PlayfulSparkle
 {
+    /// <summary>
+    /// The <c>Smiley</c> class provides a collection of smiley characters or representations.
+    /// </summary>
     internal class Smiley
     {
+        /// <summary>
+        /// A static dictionary that stores smiley representations as key-value pairs.
+        /// Both keys and values are strings. The dictionary uses ordinal string comparison,
+        /// meaning comparisons are case-sensitive and based on the Unicode code points of the characters.
+        /// </summary>
         public static Dictionary<string, string> chars = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             // Smileys & Emotion
