@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 
 namespace PlayfulSparkle
 {
     public class Transliterate
     {
+        private static Dictionary<string, string> smileyUnicodeToReplacement = new Dictionary<string, string>();
+
+        private static Dictionary<string, string> mappingsUnicodeToReplacement = new Dictionary<string, string>();
+
         public enum Normalization
         {
             Decompose, // NFD
@@ -16,7 +19,14 @@ namespace PlayfulSparkle
             CompatibilityDecompose // NFKD
         }
 
-        public static string Decompose(string str, Normalization normalization)
+        static Transliterate()
+        {
+            smileyUnicodeToReplacement = PreprocessDictionary(Smiley.chars);
+
+            mappingsUnicodeToReplacement = PreprocessDictionary(Mappings.chars);
+        }
+
+        public static string Decompose(string str, Normalization normalization, Dictionary<string, string> customMapping = null)
         {
             if (string.IsNullOrWhiteSpace(str))
             {
@@ -24,6 +34,7 @@ namespace PlayfulSparkle
             }
 
             NormalizationForm normalizationForm;
+
             switch (normalization)
             {
                 case Normalization.Decompose:
@@ -41,37 +52,50 @@ namespace PlayfulSparkle
                 default:
                     throw new ArgumentOutOfRangeException(nameof(normalization), normalization, null);
             }
-
-            // First, preprocess both dictionaries to create lookup tables
-            Dictionary<string, string> smileyUnicodeToReplacement = PreprocessDictionary(Smiley.chars);
-            Dictionary<string, string> mappingsUnicodeToReplacement = PreprocessDictionary(Mappings.chars);
+            
+            if (customMapping != null)
+            {
+                customMapping = PreprocessDictionary(customMapping);
+            }
 
             // First pass - handle both emoji sequences and complex character mappings
             StringBuilder firstPassResult = new StringBuilder();
-            int i = 0;
-            while (i < str.Length)
+
+            int idx = 0;
+
+            while (idx < str.Length)
             {
                 bool found = false;
 
                 // Try to match the longest sequence first (up to 8 characters)
-                for (int len = Math.Min(8, str.Length - i); len > 0 && !found; len--)
+                for (int len = Math.Min(8, str.Length - idx); len > 0 && !found; len--)
                 {
-                    if (i + len <= str.Length)
+                    if (idx + len <= str.Length)
                     {
-                        string candidateSequence = str.Substring(i, len);
+                        string candidateSequence = str.Substring(idx, len);
 
-                        // Try Smiley dictionary first
-                        if (smileyUnicodeToReplacement.TryGetValue(candidateSequence, out string smileyReplacement))
+                        if (customMapping != null && customMapping.TryGetValue(candidateSequence, out string customMappingReplacement))
                         {
-                            firstPassResult.Append(smileyReplacement);
-                            i += len;
+                            firstPassResult.Append(customMappingReplacement);
+
+                            idx += len;
+
                             found = true;
                         }
-                        // Then try Mappings dictionary
                         else if (mappingsUnicodeToReplacement.TryGetValue(candidateSequence, out string mappingReplacement))
                         {
                             firstPassResult.Append(mappingReplacement);
-                            i += len;
+
+                            idx += len;
+
+                            found = true;
+                        }
+                        else if (smileyUnicodeToReplacement.TryGetValue(candidateSequence, out string smileyReplacement))
+                        {
+                            firstPassResult.Append(smileyReplacement);
+
+                            idx += len;
+
                             found = true;
                         }
                     }
@@ -80,9 +104,11 @@ namespace PlayfulSparkle
                 // If no match was found, process as a single character
                 if (!found)
                 {
-                    char c = str[i];
-                    string charStr = c.ToString();
-                    string unicodeKey = $"U+{(int)c:X4}";
+                    char chr = str[idx];
+
+                    string charStr = chr.ToString();
+
+                    string unicodeKey = $"U+{(int)chr:X4}";
 
                     // Try to find in Mappings dictionary by Unicode notation
                     if (Mappings.chars.TryGetValue(unicodeKey, out string mappingReplacement))
@@ -97,9 +123,10 @@ namespace PlayfulSparkle
                     else
                     {
                         // If no match, add the character as is
-                        firstPassResult.Append(c);
+                        firstPassResult.Append(chr);
                     }
-                    i++;
+
+                    idx++;
                 }
             }
 
@@ -108,11 +135,12 @@ namespace PlayfulSparkle
 
             // Remove combining marks after normalization
             StringBuilder finalResult = new StringBuilder();
-            foreach (char c in normalizedResult)
+
+            foreach (char chr in normalizedResult)
             {
-                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                if (CharUnicodeInfo.GetUnicodeCategory(chr) != UnicodeCategory.NonSpacingMark)
                 {
-                    finalResult.Append(c);
+                    finalResult.Append(chr);
                 }
             }
 
@@ -123,10 +151,12 @@ namespace PlayfulSparkle
         private static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
-            foreach (var entry in source)
+
+            foreach (KeyValuePair<string, string> entry in source)
             {
                 // Convert from "U+XXXX U+YYYY" format to actual Unicode characters
                 string unicodeSequence = ConvertUnicodeNotationToChars(entry.Key);
+
                 result[unicodeSequence] = entry.Value;
             }
             return result;
@@ -136,6 +166,7 @@ namespace PlayfulSparkle
         private static string ConvertUnicodeNotationToChars(string unicodeNotation)
         {
             StringBuilder result = new StringBuilder();
+
             string[] parts = unicodeNotation.Split(' ');
 
             foreach (string part in parts)
@@ -143,16 +174,15 @@ namespace PlayfulSparkle
                 if (part.StartsWith("U+"))
                 {
                     string hexValue = part.Substring(2);
-                    int intValue = int.Parse(hexValue, NumberStyles.HexNumber);
 
-                    // Handle values beyond the BMP (Basic Multilingual Plane)
-                    if (intValue <= 0xFFFF)
+                    int intValue = int.Parse(hexValue, NumberStyles.HexNumber);
+                    
+                    if (intValue <= 0xFFFF) // Handle values beyond the BMP (Basic Multilingual Plane)
                     {
                         result.Append((char)intValue);
                     }
-                    else
+                    else // Convert to surrogate pairs for values outside BMP
                     {
-                        // Convert to surrogate pairs for values outside BMP
                         result.Append(char.ConvertFromUtf32(intValue));
                     }
                 }
