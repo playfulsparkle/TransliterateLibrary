@@ -21,4 +21,12 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <EditorConfigFiles Remove="D:\Projektek\PlayfulSparkle\GitHub\TransliterateLibrary\.editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="D:\Projektek\PlayfulSparkle\GitHub\TransliterateLibrary\.editorconfig" />
+  </ItemGroup>
+
 </Project>
