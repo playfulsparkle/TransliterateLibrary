@@ -134,6 +134,15 @@ foreach (var entry in processedDictionary)
 
 ## Release Notes
 
+### 0.0.12
+
+* Fixed: `IsValidUnicodeString` method has been replaced with a more comprehensive implementation that:
+	- Properly validates surrogate pairs in Unicode strings
+	- Detects isolated high and low surrogates (e.g., character 0xD800)
+	- Identifies Unicode noncharacters (ranges 0xFDD0-0xFDEF and code points ending with FFFE/FFFF)
+	- Uses UTF-8 encoding validation as an additional verification layer
+	- Maintains performance while providing more accurate Unicode validation
+
 ### 0.0.11
 
 * Fixed: The `IsValidUnicodeString` method now accurately validates user input for valid Unicode sequences by correctly identifying and rejecting strings containing lone high or low surrogate characters.

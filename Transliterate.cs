@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace PlayfulSparkle
 {
@@ -274,33 +275,84 @@ namespace PlayfulSparkle
         /// </returns>
         private static bool IsValidUnicodeString(string str)
         {
-            for (int idx = 0; idx < str.Length; idx++)
+            // First check for isolated surrogates
+            for (int i = 0; i < str.Length; i++)
             {
-                char chr = str[idx];
+                char c = str[i];
 
-                // Check for lone surrogates (invalid Unicode)
-                if (char.IsHighSurrogate(chr))
+                // Check for high surrogates
+                if (char.IsHighSurrogate(c))
                 {
                     // High surrogate must be followed by a low surrogate
-                    if (idx + 1 >= str.Length || !char.IsLowSurrogate(str[idx + 1]))
-                    {
-                        return false; // Lone high surrogate
-                    }
-                    idx++; // Skip the next character (already checked as part of the surrogate pair)
-                }
-                else if (char.IsLowSurrogate(chr))
-                {
-                    // Low surrogate must be preceded by a high surrogate
-                    return false; // Lone low surrogate
-                }
+                    if (i + 1 >= str.Length || !char.IsLowSurrogate(str[i + 1]))
+                        return false;
 
-                // Optional: Check for control characters (original behavior)
-                if (CharUnicodeInfo.GetUnicodeCategory(chr) == UnicodeCategory.Control)
+                    // Skip the low surrogate we just checked
+                    i++;
+                }
+                // Check for isolated low surrogates
+                else if (char.IsLowSurrogate(c))
                 {
+                    // Low surrogate without a preceding high surrogate
                     return false;
                 }
             }
-            return true;
+
+            // Check for other invalid Unicode code points
+            // A clever approach: use UTF8Encoding with error detection
+            try
+            {
+                byte[] encoded = Encoding.UTF8.GetBytes(str);
+                string decoded = Encoding.UTF8.GetString(encoded);
+
+                // If the round-trip changes the string, there were invalid sequences
+                if (decoded.Length != str.Length)
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < str.Length; i++)
+                {
+                    if (decoded[i] != str[i])
+                        return false;
+                }
+
+                // Check for specific invalid code points
+                for (int i = 0; i < str.Length; i++)
+                {
+                    char c = str[i];
+
+                    // Skip surrogate pairs (already validated above)
+                    if (char.IsHighSurrogate(c) && i + 1 < str.Length && char.IsLowSurrogate(str[i + 1]))
+                    {
+                        // Get the Unicode code point
+                        int codePoint = char.ConvertToUtf32(str, i);
+
+                        // Check for noncharacters
+                        if ((codePoint >= 0xFDD0 && codePoint <= 0xFDEF) ||
+                            (codePoint & 0xFFFE) == 0xFFFE ||
+                            (codePoint & 0xFFFF) == 0xFFFF)
+                            return false;
+
+                        i++; // Skip the low surrogate
+                    }
+                    // For BMP characters, check directly
+                    else if (!char.IsSurrogate(c))
+                    {
+                        // Check for noncharacters
+                        if ((c >= 0xFDD0 && c <= 0xFDEF) ||
+                            (c & 0xFFFE) == 0xFFFE)
+                            return false;
+                    }
+                }
+
+                return true;
+            }
+            catch (EncoderFallbackException)
+            {
+                // If encoding throws an exception, the string contains invalid Unicode
+                return false;
+            }
         }
     }
 }
