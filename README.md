@@ -26,6 +26,106 @@ Ideal for applications requiring language-agnostic preprocessing such as SEO san
 
 ---
 
+## API
+
+### Decompose
+
+The `Decompose` method is used to transliterate and normalize an input string based on a specified Unicode normalization form. It processes the string by applying custom character mappings (if provided) and default mappings for complex characters (e.g., emoji and Unicode sequences). The method can be used to decompose composed characters into their base forms or apply other normalization forms like composition or compatibility normalization.
+
+```csharp
+public static string Decompose(string str, Normalization normalization, Dictionary<string, string> customMapping = null)
+```
+
+**Parameters:**
+
+* **str:** The input string to be processed.
+* **normalization:** The desired Unicode normalization form to apply. This can be one of the values from the Normalization enum:
+	- **Normalization.Decompose:** Decomposes composed characters into base characters and combining characters (NFD).
+	- **Normalization.Compose:** Combines characters into composed characters (NFC).
+	- **Normalization.CompatibilityCompose:** Applies compatibility decomposition followed by composition (NFKC).
+	- **Normalization.CompatibilityDecompose:** Applies compatibility decomposition followed by decomposition (NFKD).
+* **customMapping (optional):** A dictionary of custom character mappings to apply before the default mappings. Keys should be Unicode character sequences as strings, and values should be their replacement strings.
+
+**Returns:**
+
+The transliterated and normalized string.
+
+**Example:**
+
+```csharp
+string input = "Some text with 😊 and complex characters!";
+
+var result = Transliterate.Decompose(input, Transliterate.Normalization.Decompose);
+
+Console.WriteLine(result);
+```
+
+### DecomposeAsync
+
+The `DecomposeAsync` method is an asynchronous version of the `Decompose` method. It runs the transliteration and normalization process in a separate task to avoid blocking the calling thread, which is useful in scenarios where you need to process large strings or perform the operation without affecting the responsiveness of your application.
+
+```csharp
+public static async Task<string> DecomposeAsync(string str, Normalization normalization, Dictionary<string, string> customMapping = null)
+```
+
+**Parameters:**
+
+* **str:** The input string to be processed.
+* **normalization:** The desired Unicode normalization form to apply. This can be one of the values from the Normalization enum:
+	- **Normalization.Decompose:** Decomposes composed characters into base characters and combining characters (NFD).
+	- **Normalization.Compose:** Combines characters into composed characters (NFC).
+	- **Normalization.CompatibilityCompose:** Applies compatibility decomposition followed by composition (NFKC).
+	- **Normalization.CompatibilityDecompose:** Applies compatibility decomposition followed by decomposition (NFKD).
+* **customMapping (optional):** A dictionary of custom character mappings to apply before the default mappings. Keys should be Unicode character sequences as strings, and values should be their replacement strings.
+
+**Returns:**
+
+A `Task<string>` representing the asynchronous operation, containing the transliterated and normalized string.
+
+**Example:**
+
+```csharp
+string input = "Another text with 😊 and more complex characters!";
+
+var result = await Transliterate.DecomposeAsync(input, Transliterate.Normalization.Compose);
+
+Console.WriteLine(result);
+```
+
+### PreprocessDictionary
+
+The `PreprocessDictionary` method is used to process a dictionary where keys are Unicode notations (e.g., `"U+XXXX"` or `"U+XXXX U+YYYY"`) and convert them into actual Unicode characters.
+
+```csharp
+public static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
+```
+
+**Parameters:**
+
+* **source:** The input dictionary where keys are in Unicode notation (e.g., `"U+1F642"`).
+
+**Returns:**
+
+A new dictionary where the keys are actual Unicode characters represented by the notation in the input dictionary.
+
+**Example:**
+
+```csharp
+Dictionary<string, string> unicodeMapping = new Dictionary<string, string>
+{
+    { "U+1F642", "😊" },
+    { "U+1F60D", "😍" }
+};
+
+var processedDictionary = Transliterate.PreprocessDictionary(unicodeMapping);
+foreach (var entry in processedDictionary)
+{
+    Console.WriteLine($"Unicode: {entry.Key}, Replacement: {entry.Value}");
+}
+```
+
+---
+
 ## Known Issues
 
 - **Custom mappings reprocessing**: Custom mappings are reprocessed on each method call, which may impact performance when dealing with large input strings or multiple consecutive transliterations.
@@ -56,7 +156,9 @@ We encourage users to use the GitHub Issues page for bug reports and feature req
 This extension is licensed under the [BSD-3-Clause License](https://github.com/playfulsparkle/vs_ps_replace_accents/blob/main/LICENSE). See the `LICENSE` file for complete details.
 
 ---
+
 ## Author
 
 Hi! We're the team behind Playful Sparkle, a creative agency from Slovakia. We got started way back in 2004 and have been having fun building digital solutions ever since. Whether it's crafting a brand, designing a website, developing an app, or anything in between, we're all about delivering great results with a smile. We hope you enjoy using our Visual Studio extension!
+
 ---
