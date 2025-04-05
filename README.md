@@ -33,7 +33,7 @@ Ideal for applications requiring language-agnostic preprocessing such as SEO san
 The `Decompose` method is used to transliterate and normalize an input string based on a specified Unicode normalization form. It processes the string by applying custom character mappings (if provided) and default mappings for complex characters (e.g., emoji and Unicode sequences). The method can be used to decompose composed characters into their base forms or apply other normalization forms like composition or compatibility normalization.
 
 ```csharp
-public static string Decompose(string str, Normalization normalization, Dictionary<string, string> customMapping = null)
+public static string Decompose(string str, Normalization? normalization = null, Dictionary<string, string> customMapping = null)
 ```
 
 **Parameters:**
@@ -65,7 +65,7 @@ Console.WriteLine(result);
 The `DecomposeAsync` method is an asynchronous version of the `Decompose` method. It runs the transliteration and normalization process in a separate task to avoid blocking the calling thread, which is useful in scenarios where you need to process large strings or perform the operation without affecting the responsiveness of your application.
 
 ```csharp
-public static async Task<string> DecomposeAsync(string str, Normalization normalization, Dictionary<string, string> customMapping = null)
+public static async Task<string> DecomposeAsync(string str, Normalization? normalization = null, Dictionary<string, string> customMapping = null)
 ```
 
 **Parameters:**
@@ -133,6 +133,49 @@ foreach (var entry in processedDictionary)
 ---
 
 ## Release Notes
+
+### 0.0.11
+
+* Fixed: The `IsValidUnicodeString` method now accurately validates user input for valid Unicode sequences by correctly identifying and rejecting strings containing lone high or low surrogate characters.
+
+### 0.0.10
+
+* Updated API documentation.
+
+### 0.0.9
+
+* Removed `PreprocessDictionary` for the user-defined character mapping. The user can now pass directly to the `Decompose` method.
+
+### 0.0.8
+
+* Added async version of `Decompose` method for non-blocking operations.
+* Added check for user input to ensure valid input.
+
+### 0.0.7
+
+* Added custom mappings support for user-defined character mappings.
+
+### 0.0.6
+
+* Updated `Decompose` method to handle surrogate pairs and multi-codepoint sequences.
+
+### 0.0.5
+
+* Testing default mapping unicode notation to latin characters.
+
+### 0.0.4
+
+* Testing unicode notation to latin characters.
+
+### 0.0.3
+
+* Implemented core functionality for the **Playful Sparkle: Transliterate Library** extension for Visual Studio.
+* Added Emoji and smiley sequence replacement based on pre-defined Unicode mappings.
+* Added default mappings for complex characters (e.g., ligatures, non-ASCII characters) to simplified ASCII representations.
+
+### 0.0.2
+
+* Added core files and project documentation for the **Playful Sparkle: Transliterate Library** extension for Visual Studio.
 
 ### 0.0.1
 
