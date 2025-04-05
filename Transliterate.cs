@@ -61,9 +61,9 @@ namespace PlayfulSparkle
         }
 
         /// <summary>
-        /// Transliterates and normalizes the input string based on the specified normalization form and optional custom mappings.
+        /// Transliterates and normalizes the str string based on the specified normalization form and optional custom mappings.
         /// </summary>
-        /// <param name="str">The input string to be processed.</param>
+        /// <param name="str">The str string to be processed.</param>
         /// <param name="normalization">The desired Unicode normalization form to apply.</param>
         /// <param name="useDefaultMapping">Indicates whether to use the default character mappings.</param>
         /// <param name="customMapping">An optional dictionary containing custom character or sequence mappings to be applied before the default mappings.
@@ -111,6 +111,11 @@ namespace PlayfulSparkle
                 return Normalize(str, normalizationForm);
             }
 
+            // Validate user-provided custom mapping before using it.
+            if (!ValidateCustomMapping(customMapping))
+            {
+                throw new ArgumentOutOfRangeException(nameof(customMapping), "Custom mapping contains invalid entries.");
+            }
 
             // First pass - handle both emoji sequences and complex character mappings
             StringBuilder firstPassResult = new StringBuilder();
@@ -184,14 +189,14 @@ namespace PlayfulSparkle
                 }
             }
 
-           return Normalize(firstPassResult.ToString(), normalizationForm);
+            return Normalize(firstPassResult.ToString(), normalizationForm);
         }
 
         /// <summary>
-        /// Asynchronously transliterates and normalizes the input string based on the specified normalization form and optional custom mappings.
+        /// Asynchronously transliterates and normalizes the str string based on the specified normalization form and optional custom mappings.
         /// This method runs the decomposition process in a separate task to avoid blocking the calling thread.
         /// </summary>
-        /// <param name="str">The input string to be processed.</param>
+        /// <param name="str">The str string to be processed.</param>
         /// <param name="normalization">The desired Unicode normalization form to apply.</param>
         /// <param name="useDefaultMapping">Indicates whether to use the default character mappings.</param>
         /// <param name="customMapping">An optional dictionary containing custom character or sequence mappings to be applied before the default mappings.
@@ -209,10 +214,69 @@ namespace PlayfulSparkle
         }
 
         /// <summary>
-        /// Normalizes the input string according to the specified Unicode normalization form and then removes any non-spacing combining marks.
+        /// Validates a custom mapping dictionary to ensure that keys and values adhere to specific length constraints.
+        /// </summary>
+        /// <param name="customMapping">The dictionary representing the custom mapping, where keys and values are strings.</param>
+        /// <returns>
+        /// <c>true</c> if the custom mapping is valid (or null); otherwise, <c>false</c>.
+        /// A mapping is considered valid if all keys have a length of at most 6 graphemes and all values have a length of at most 40 graphemes.
+        /// If the <paramref name="customMapping"/> is null, this method returns <c>true</c>.
+        /// </returns>
+        private static bool ValidateCustomMapping(Dictionary<string, string> customMapping)
+        {
+            if (customMapping == null)
+            {
+                return true;
+            }
+
+            foreach (KeyValuePair<string, string> pair in customMapping)
+            {
+                if (!StrLength(pair.Key, 6) || !StrLength(pair.Value, 40))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Checks if the length of a string, measured in graphemes, is less than or equal to a specified maximum.
+        /// </summary>
+        /// <param name="str">The string to check.</param>
+        /// <param name="maxGraphemes">The maximum allowed number of graphemes in the string.</param>
+        /// <returns>
+        /// <c>true</c> if the string is not null or whitespace and its length in graphemes is less than or equal to <paramref name="maxGraphemes"/>; otherwise, <c>false</c>.
+        /// </returns>
+        private static bool StrLength(string str, int maxGraphemes)
+        {
+            if (string.IsNullOrWhiteSpace(str))
+            {
+                return false;
+            }
+
+            var enumerator = StringInfo.GetTextElementEnumerator(str);
+
+            int count = 0;
+
+            while (enumerator.MoveNext())
+            {
+                count++;
+
+                if (count > maxGraphemes)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Normalizes the str string according to the specified Unicode normalization form and then removes any non-spacing combining marks.
         /// This process is useful for tasks like text comparison or preparing text for indexing where diacritics or other combining marks should be ignored.
         /// </summary>
-        /// <param name="str">The input string to be normalized and processed.</param>
+        /// <param name="str">The str string to be normalized and processed.</param>
         /// <param name="normalizationForm">The Unicode normalization form to apply. Common forms include NFC, NFD, NFKC, and NFKD.</param>
         /// <returns>A new string that is normalized according to the specified form and has all non-spacing combining marks removed.</returns>
         private static string Normalize(string str, NormalizationForm normalizationForm)
@@ -238,8 +302,8 @@ namespace PlayfulSparkle
         /// Preprocesses a dictionary by converting Unicode notation (e.g., "U+XXXX" or "U+XXXX U+YYYY") in the keys
         /// to their corresponding actual Unicode characters.
         /// </summary>
-        /// <param name="source">The input dictionary where keys are in Unicode notation.</param>
-        /// <returns>A new dictionary where the keys are the actual Unicode characters represented by the notation in the input dictionary.</returns>
+        /// <param name="source">The str dictionary where keys are in Unicode notation.</param>
+        /// <returns>A new dictionary where the keys are the actual Unicode characters represented by the notation in the str dictionary.</returns>
         private static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
@@ -260,7 +324,7 @@ namespace PlayfulSparkle
         /// </summary>
         /// <param name="unicodeNotation">The string containing Unicode notations, where each notation starts with "U+" followed by the hexadecimal Unicode code point,
         /// and multiple notations can be separated by spaces.</param>
-        /// <returns>A string containing the Unicode characters represented by the input notation.</returns>
+        /// <returns>A string containing the Unicode characters represented by the str notation.</returns>
         private static string ConvertUnicodeNotationToChars(string unicodeNotation)
         {
             StringBuilder result = new StringBuilder();
