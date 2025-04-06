@@ -10,7 +10,7 @@
     <Description>Transliterate is a utility library designed to seamlessly convert accented characters into their ASCII equivalents.</Description>
     <Copyright>2025</Copyright>
     <PackageTags>ascii diacritics accent letter alphabet remove replace playfulsparkle visualstudio extension</PackageTags>
-    <PackageReleaseNotes>Added new option `useDefaultMapping` (defaults to `true`) to enable or disable the built-in default mapping. The `PreprocessDictionary` method is now private for improved code maintainability. Renamed "Smiley mapping" to "Emoji mapping" and "Mapping" to "Default mapping".</PackageReleaseNotes>
+    <PackageReleaseNotes>Improved Emoji Text Alternatives: To more accurately identify and display the correct text alternatives for emojis, we added an internal method `GetMaxKeyLength` to calculate the maximum key length for mappings, resolving potential issues with shorter, incorrect matches.</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <Title>Transliterate Library</Title>
     <PackageReadmeFile>README.md</PackageReadmeFile>
