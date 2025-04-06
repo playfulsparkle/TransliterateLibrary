@@ -25,6 +25,10 @@ namespace PlayfulSparkle
         /// </summary>
         internal static Dictionary<string, string> defaultMappingsUnicodeToReplacement = new Dictionary<string, string>();
 
+        internal static int emojiMaxKeyLength;
+
+        internal static int defaultMappingsMaxKeyLength;
+
         /// <summary>
         /// Defines the different Unicode normalization forms that can be applied to a string.
         /// </summary>
@@ -55,9 +59,26 @@ namespace PlayfulSparkle
         /// </summary>
         static Transliterate()
         {
-            emojiUnicodeToReplacement = PreprocessDictionary(Emoji.chars); // Assuming Emoji.chars is accessible
+            emojiUnicodeToReplacement = PreprocessDictionary(Emoji.chars);
+            defaultMappingsUnicodeToReplacement = PreprocessDictionary(DefaultMappings.chars);
 
-            defaultMappingsUnicodeToReplacement = PreprocessDictionary(DefaultMappings.chars); // Assuming DefaultMappings.chars is accessible
+            emojiMaxKeyLength = GetMaxKeyLength(emojiUnicodeToReplacement);
+            defaultMappingsMaxKeyLength = GetMaxKeyLength(defaultMappingsUnicodeToReplacement);
+        }
+
+        internal static int GetMaxKeyLength(Dictionary<string, string> dict)
+        {
+            int maxLength = 0;
+
+            foreach (string key in dict.Keys)
+            {
+                if (key.Length > maxLength)
+                {
+                    maxLength = key.Length;
+                }
+            }
+
+            return maxLength;
         }
 
         /// <summary>
@@ -105,6 +126,25 @@ namespace PlayfulSparkle
                     break;
             }
 
+            int maxKeyLength = 0;
+
+            if (useDefaultMapping)
+            {
+                maxKeyLength = Math.Max(emojiMaxKeyLength, defaultMappingsMaxKeyLength);
+            }
+
+            if (customMapping != null)
+            {
+                int customMax = 0;
+                foreach (string key in customMapping.Keys)
+                {
+                    if (key.Length > customMax)
+                    {
+                        customMax = key.Length;
+                    }
+                }
+                maxKeyLength = Math.Max(maxKeyLength, customMax);
+            }
 
             if (!useDefaultMapping && customMapping == null)
             {
@@ -126,35 +166,31 @@ namespace PlayfulSparkle
             {
                 bool found = false;
 
-                // Try to match the longest sequence first (up to 8 characters)
-                for (int len = Math.Min(8, str.Length - idx); len > 0 && !found; len--)
+                int currentMaxPossible = Math.Min(maxKeyLength, str.Length - idx);
+
+                for (int len = currentMaxPossible; len > 0 && !found; len--)
                 {
                     if (idx + len <= str.Length)
                     {
                         string candidateSequence = str.Substring(idx, len);
 
+                        // Check custom mappings first
                         if (customMapping != null && customMapping.TryGetValue(candidateSequence, out string customMappingReplacement))
                         {
                             firstPassResult.Append(customMappingReplacement);
-
                             idx += len;
-
-                            found = true;
-                        }
-                        else if (useDefaultMapping && defaultMappingsUnicodeToReplacement.TryGetValue(candidateSequence, out string mappingReplacement))
-                        {
-                            firstPassResult.Append(mappingReplacement);
-
-                            idx += len;
-
                             found = true;
                         }
                         else if (useDefaultMapping && emojiUnicodeToReplacement.TryGetValue(candidateSequence, out string emojiReplacement))
                         {
                             firstPassResult.Append(emojiReplacement);
-
                             idx += len;
-
+                            found = true;
+                        }
+                        else if (useDefaultMapping && defaultMappingsUnicodeToReplacement.TryGetValue(candidateSequence, out string mappingReplacement))
+                        {
+                            firstPassResult.Append(mappingReplacement);
+                            idx += len;
                             found = true;
                         }
                     }
@@ -169,15 +205,15 @@ namespace PlayfulSparkle
 
                     string unicodeKey = $"U+{(int)chr:X4}";
 
-                    // Try to find in DefaultMappings dictionary by Unicode notation
-                    if (useDefaultMapping && DefaultMappings.chars.TryGetValue(unicodeKey, out string mappingReplacement)) // Assuming DefaultMappings.chars is accessible
-                    {
-                        firstPassResult.Append(mappingReplacement);
-                    }
                     // Try to find in Emoji dictionary by Unicode notation
-                    else if (useDefaultMapping && Emoji.chars.TryGetValue(unicodeKey, out string emojiReplacement)) // Assuming Emoji.chars is accessible
+                    if (useDefaultMapping && Emoji.chars.TryGetValue(unicodeKey, out string emojiReplacement)) // Assuming Emoji.chars is accessible
                     {
                         firstPassResult.Append(emojiReplacement);
+                    }
+                    // Try to find in DefaultMappings dictionary by Unicode notation
+                    else if (useDefaultMapping && DefaultMappings.chars.TryGetValue(unicodeKey, out string mappingReplacement)) // Assuming DefaultMappings.chars is accessible
+                    {
+                        firstPassResult.Append(mappingReplacement);
                     }
                     else
                     {
