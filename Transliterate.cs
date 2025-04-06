@@ -1,29 +1,29 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
 
+[assembly: InternalsVisibleTo("TransliterateLibrary.UnitTest")]
 namespace PlayfulSparkle
 {
     /// <summary>
     /// Provides functionality to transliterate and normalize strings.
     /// </summary>
-    public class Transliterate
+    public static class Transliterate
     {
         /// <summary>
         /// A dictionary mapping Unicode representations of emojis to their replacement strings.
         /// This dictionary is initialized during the class's static initialization.
         /// </summary>
-        private static Dictionary<string, string> emojiUnicodeToReplacement = new Dictionary<string, string>();
+        internal static Dictionary<string, string> emojiUnicodeToReplacement = new Dictionary<string, string>();
 
         /// <summary>
         /// A dictionary mapping Unicode representations of various characters or character sequences to their replacement strings.
         /// This dictionary is initialized during the class's static initialization.
         /// </summary>
-        private static Dictionary<string, string> defaultMappingsUnicodeToReplacement = new Dictionary<string, string>();
+        internal static Dictionary<string, string> defaultMappingsUnicodeToReplacement = new Dictionary<string, string>();
 
         /// <summary>
         /// Defines the different Unicode normalization forms that can be applied to a string.
@@ -222,7 +222,7 @@ namespace PlayfulSparkle
         /// A mapping is considered valid if all keys have a length of at most 6 graphemes and all values have a length of at most 40 graphemes.
         /// If the <paramref name="customMapping"/> is null, this method returns <c>true</c>.
         /// </returns>
-        private static bool ValidateCustomMapping(Dictionary<string, string> customMapping)
+        internal static bool ValidateCustomMapping(Dictionary<string, string> customMapping)
         {
             if (customMapping == null)
             {
@@ -248,7 +248,7 @@ namespace PlayfulSparkle
         /// <returns>
         /// <c>true</c> if the string is not null or whitespace and its length in graphemes is less than or equal to <paramref name="maxGraphemes"/>; otherwise, <c>false</c>.
         /// </returns>
-        private static bool StrLength(string str, int maxGraphemes)
+        internal static bool StrLength(string str, int maxGraphemes)
         {
             if (string.IsNullOrWhiteSpace(str))
             {
@@ -279,7 +279,7 @@ namespace PlayfulSparkle
         /// <param name="str">The str string to be normalized and processed.</param>
         /// <param name="normalizationForm">The Unicode normalization form to apply. Common forms include NFC, NFD, NFKC, and NFKD.</param>
         /// <returns>A new string that is normalized according to the specified form and has all non-spacing combining marks removed.</returns>
-        private static string Normalize(string str, NormalizationForm normalizationForm)
+        internal static string Normalize(string str, NormalizationForm normalizationForm)
         {
             // Now apply normalization to the result
             string normalizedResult = str.Normalize(normalizationForm);
@@ -304,7 +304,7 @@ namespace PlayfulSparkle
         /// </summary>
         /// <param name="source">The str dictionary where keys are in Unicode notation.</param>
         /// <returns>A new dictionary where the keys are the actual Unicode characters represented by the notation in the str dictionary.</returns>
-        private static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
+        internal static Dictionary<string, string> PreprocessDictionary(Dictionary<string, string> source)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
 
@@ -325,29 +325,56 @@ namespace PlayfulSparkle
         /// <param name="unicodeNotation">The string containing Unicode notations, where each notation starts with "U+" followed by the hexadecimal Unicode code point,
         /// and multiple notations can be separated by spaces.</param>
         /// <returns>A string containing the Unicode characters represented by the str notation.</returns>
-        private static string ConvertUnicodeNotationToChars(string unicodeNotation)
+        internal static string ConvertUnicodeNotationToChars(string unicodeNotation)
         {
-            StringBuilder result = new StringBuilder();
+            if (string.IsNullOrEmpty(unicodeNotation))
+                return string.Empty;
 
-            string[] parts = unicodeNotation.Split(' ');
+            var result = new StringBuilder(unicodeNotation.Length / 3); // Estimate capacity
 
-            foreach (string part in parts)
+            int startPos = 0;
+
+            int length = unicodeNotation.Length;
+
+            while (startPos < length)
             {
-                if (part.StartsWith("U+"))
+                // Find next "U+" marker
+                int markerPos = unicodeNotation.IndexOf("U+", startPos, StringComparison.Ordinal);
+
+                if (markerPos == -1)
+                    break;
+
+                // Move past "U+"
+                int hexStart = markerPos + 2;
+
+                if (hexStart >= length)
+                    break;
+
+                // Find end of hex value (space or end of string)
+                int hexEnd = unicodeNotation.IndexOf(' ', hexStart);
+
+                if (hexEnd == -1)
+                    hexEnd = length;
+
+                // Extract and parse hex value
+                if (hexEnd > hexStart && hexEnd - hexStart <= 8) // Max valid Unicode is U+10FFFF (6 chars + "U+")
                 {
-                    string hexValue = part.Substring(2);
+                    string hexValue = unicodeNotation.Substring(hexStart, hexEnd - hexStart);
 
-                    int intValue = int.Parse(hexValue, NumberStyles.HexNumber);
-
-                    if (intValue <= 0xFFFF) // Handle values within the Basic Multilingual Plane (BMP)
+                    // Try to parse the hex value safely
+                    if (int.TryParse(hexValue, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int codePoint))
                     {
-                        result.Append((char)intValue);
-                    }
-                    else // Convert to surrogate pairs for values outside the BMP
-                    {
-                        result.Append(char.ConvertFromUtf32(intValue));
+                        // Validate Unicode range (U+0000 to U+10FFFF)
+                        if (codePoint >= 0 && codePoint <= 0x10FFFF)
+                        {
+                            // Convert to UTF-16 character(s)
+                            result.Append(char.ConvertFromUtf32(codePoint));
+                        }
                     }
                 }
+
+                // Move to next position after current code point
+                startPos = hexEnd + 1;
             }
 
             return result.ToString();
@@ -361,86 +388,42 @@ namespace PlayfulSparkle
         /// <returns>
         ///   <c>true</c> if the string is not null or empty, and does not contain any control characters; otherwise, <c>false</c>.
         /// </returns>
-        private static bool IsValidUnicodeString(string str)
+        internal static bool IsValidUnicodeString(string str)
         {
-            // First check for isolated surrogates
+            bool expectingLowSurrogate = false;
+
             for (int i = 0; i < str.Length; i++)
             {
-                char c = str[i];
+                char current = str[i];
 
-                // Check for high surrogates
-                if (char.IsHighSurrogate(c))
+                if (expectingLowSurrogate)
                 {
-                    // High surrogate must be followed by a low surrogate
-                    if (i + 1 >= str.Length || !char.IsLowSurrogate(str[i + 1]))
-                        return false;
-
-                    // Skip the low surrogate we just checked
-                    i++;
-                }
-                // Check for isolated low surrogates
-                else if (char.IsLowSurrogate(c))
-                {
-                    // Low surrogate without a preceding high surrogate
-                    return false;
-                }
-            }
-
-            // Check for other invalid Unicode code points
-            // A clever approach: use UTF8Encoding with error detection
-            try
-            {
-                byte[] encoded = Encoding.UTF8.GetBytes(str);
-                string decoded = Encoding.UTF8.GetString(encoded);
-
-                // If the round-trip changes the string, there were invalid sequences
-                if (decoded.Length != str.Length)
-                {
-                    return false;
-                }
-
-                for (int i = 0; i < str.Length; i++)
-                {
-                    if (decoded[i] != str[i])
-                        return false;
-                }
-
-                // Check for specific invalid code points
-                for (int i = 0; i < str.Length; i++)
-                {
-                    char c = str[i];
-
-                    // Skip surrogate pairs (already validated above)
-                    if (char.IsHighSurrogate(c) && i + 1 < str.Length && char.IsLowSurrogate(str[i + 1]))
+                    if (!char.IsLowSurrogate(current))
                     {
-                        // Get the Unicode code point
-                        int codePoint = char.ConvertToUtf32(str, i);
-
-                        // Check for noncharacters
-                        if ((codePoint >= 0xFDD0 && codePoint <= 0xFDEF) ||
-                            (codePoint & 0xFFFE) == 0xFFFE ||
-                            (codePoint & 0xFFFF) == 0xFFFF)
-                            return false;
-
-                        i++; // Skip the low surrogate
+                        return false;
                     }
-                    // For BMP characters, check directly
-                    else if (!char.IsSurrogate(c))
+
+                    expectingLowSurrogate = false;
+                }
+                else
+                {
+                    if (char.IsHighSurrogate(current))
                     {
-                        // Check for noncharacters
-                        if ((c >= 0xFDD0 && c <= 0xFDEF) ||
-                            (c & 0xFFFE) == 0xFFFE)
-                            return false;
+                        if (i == str.Length - 1)
+                        {
+                            return false; // High surrogate at end of string
+                        }
+
+                        expectingLowSurrogate = true;
+                    }
+                    else if (char.IsLowSurrogate(current))
+                    {
+                        return false; // Unexpected low surrogate
                     }
                 }
+            }
 
-                return true;
-            }
-            catch (EncoderFallbackException)
-            {
-                // If encoding throws an exception, the string contains invalid Unicode
-                return false;
-            }
+            return !expectingLowSurrogate; // Check for missing low surrogate at end
         }
     }
 }
