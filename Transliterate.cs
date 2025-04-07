@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 [assembly: InternalsVisibleTo("TransliterateLibrary.UnitTest")]
@@ -17,25 +18,25 @@ namespace PlayfulSparkle
         /// A dictionary mapping Unicode representations of emojis to their replacement strings.
         /// This dictionary is initialized during the class's static initialization.
         /// </summary>
-        internal static Dictionary<string, string> emojiUnicodeMappings = new Dictionary<string, string>();
+        internal static readonly Dictionary<string, string> emojiUnicodeMappings = new Dictionary<string, string>();
 
         /// <summary>
         /// A dictionary mapping Unicode representations of various characters or character sequences to their replacement strings.
         /// This dictionary is initialized during the class's static initialization.
         /// </summary>
-        internal static Dictionary<string, string> defaultUnicodeMappings = new Dictionary<string, string>();
+        internal static readonly Dictionary<string, string> defaultUnicodeMappings = new Dictionary<string, string>();
 
         /// <summary>
         /// Stores the maximum length of keys in the <see cref="emojiUnicodeMappings"/> dictionary.
         /// This value is calculated during the class's static initialization to optimize lookup operations.
         /// </summary>
-        internal static int emojiMappingsMaxKeyLength;
+        internal static readonly int emojiMappingsMaxKeyLength;
 
         /// <summary>
         /// Stores the maximum length of keys in the <see cref="defaultUnicodeMappings"/> dictionary.
         /// This value is calculated during the class's static initialization to optimize lookup operations.
         /// </summary>
-        internal static int defaultMappingsMaxKeyLength;
+        internal static readonly int defaultMappingsMaxKeyLength;
 
         /// <summary>
         /// Defines the different Unicode normalization forms that can be applied to a string.
@@ -86,6 +87,8 @@ namespace PlayfulSparkle
         /// The keys of this dictionary should be Unicode character sequences (as strings), and the values should be their replacement strings.</param>
         /// <returns>The transliterated and normalized string.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown if the provided <paramref name="normalization"/> value is not a valid member of the <see cref="Normalization"/> enum.</exception>
+        /// <exception cref="ArgumentException">Thrown if the input text is null or empty, or if it contains invalid Unicode characters.</exception>
+        /// <exception cref="OperationCanceledException">Thrown if the operation is canceled via the cancellation token.</exception>
         public static string Decompose(
             string text,
             Normalization normalization,
@@ -153,7 +156,7 @@ namespace PlayfulSparkle
             }
 
             // First pass - handle both emoji sequences and complex character mappings
-            StringBuilder firstPassResult = new StringBuilder();
+            StringBuilder firstPassResult = new StringBuilder(text.Length);
 
             int idx = 0;
 
@@ -232,16 +235,23 @@ namespace PlayfulSparkle
         /// <param name="useDefaultMapping">Indicates whether to use the default character mappings.</param>
         /// <param name="customMapping">An optional dictionary containing custom character or sequence mappings to be applied before the default mappings.
         /// The keys of this dictionary should be Unicode character sequences (as strings), and the values should be their replacement strings.</param>
+        /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
         /// <returns>A <see cref="Task{String}"/> that represents the asynchronous operation, containing the transliterated and normalized string.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown if the provided <paramref name="normalization"/> value is not a valid member of the <see cref="Normalization"/> enum.</exception>
+        /// <exception cref="ArgumentException">Thrown if the input text is null or empty, or if it contains invalid Unicode characters.</exception>
+        /// <exception cref="OperationCanceledException">Thrown if the operation is canceled via the cancellation token.</exception>
         public static async Task<string> DecomposeAsync(
             string text,
             Normalization normalization,
             bool useDefaultMapping = true,
-            Dictionary<string, string> customMapping = null
+            Dictionary<string, string> customMapping = null,
+            CancellationToken cancellationToken = default
         )
         {
-            return await Task.Run(() => Decompose(text, normalization, useDefaultMapping, customMapping));
+            return await Task.Run(() =>
+                Decompose(text, normalization, useDefaultMapping, customMapping),
+                cancellationToken
+            );
         }
 
         /// <summary>
@@ -306,7 +316,7 @@ namespace PlayfulSparkle
         {
             if (dict == null || dict.Count == 0)
             {
-                return new Dictionary<string, string>();
+                return new Dictionary<string, string>(0);
             }
 
             Dictionary<string, string> processedDictionary = new Dictionary<string, string>();
@@ -368,11 +378,22 @@ namespace PlayfulSparkle
                 return string.Empty;
             }
 
-            // Now apply normalization to the processedDictionary
-            string normalizedText = text.Normalize(normalizationForm);
+            string normalizedText = string.Empty;
+
+            try
+            {
+                // Now apply normalization to the processedDictionary
+                normalizedText = text.Normalize(normalizationForm);
+            }
+            catch (ArgumentException)
+            {
+                return string.Empty;
+            }
 
             // Remove combining marks after normalization
-            StringBuilder normalizedResult = new StringBuilder();
+            int estimatedCapacity = Math.Max(1, (int)(normalizedText.Length * 0.8));
+
+            StringBuilder normalizedResult = new StringBuilder(estimatedCapacity);
 
             foreach (char currentCharacter in normalizedText)
             {
@@ -434,17 +455,24 @@ namespace PlayfulSparkle
                 // Extract and parse hex value
                 if (unicodeHexEndPosition > unicodeHexStartPosition && unicodeHexEndPosition - unicodeHexStartPosition <= 8) // Max valid Unicode is U+10FFFF (6 chars + "U+")
                 {
-                    string unicodeHexValue = text.Substring(unicodeHexStartPosition, unicodeHexEndPosition - unicodeHexStartPosition);
-
-                    // Try to parse the hex value safely
-                    if (int.TryParse(unicodeHexValue, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int unicodeCodePoint))
+                    try
                     {
-                        // Validate Unicode range (U+0000 to U+10FFFF)
-                        if (unicodeCodePoint >= 0 && unicodeCodePoint <= 0x10FFFF)
+                        string unicodeHexValue = text.Substring(unicodeHexStartPosition, unicodeHexEndPosition - unicodeHexStartPosition);
+
+                        // Try to parse the hex value safely
+                        if (int.TryParse(unicodeHexValue, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int unicodeCodePoint))
                         {
-                            // Convert to UTF-16 character(s)
-                            unicodeStringBuilder.Append(char.ConvertFromUtf32(unicodeCodePoint));
+                            // Validate Unicode range (U+0000 to U+10FFFF)
+                            if (unicodeCodePoint >= 0 && unicodeCodePoint <= 0x10FFFF)
+                            {
+                                // Convert to UTF-16 character(s)
+                                unicodeStringBuilder.Append(char.ConvertFromUtf32(unicodeCodePoint));
+                            }
                         }
+                    }
+                    catch (Exception ex) when (ex is ArgumentOutOfRangeException || ex is FormatException)
+                    {
+                        return string.Empty; // Invalid hex value
                     }
                 }
 
