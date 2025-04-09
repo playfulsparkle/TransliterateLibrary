@@ -117,6 +117,10 @@ Console.WriteLine(result);
 
 ## Release Notes
 
+### 0.0.15
+
+* Added 177 new character mappings.
+
 ### 0.0.14
 
 * **Improved Emoji Text Alternatives:** To more accurately identify and display the correct text alternatives for emojis, we added an internal method `GetMaxKeyLength` to calculate the maximum key length for mappings, resolving potential issues with shorter, incorrect matches.

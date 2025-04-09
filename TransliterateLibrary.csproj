@@ -10,13 +10,13 @@
     <Description>Transliterate is a utility library designed to seamlessly convert accented characters into their ASCII equivalents.</Description>
     <Copyright>2025</Copyright>
     <PackageTags>ascii diacritics accent letter alphabet remove replace playfulsparkle visualstudio extension</PackageTags>
-    <PackageReleaseNotes>Improved Emoji Text Alternatives: To more accurately identify and display the correct text alternatives for emojis, we added an internal method `GetMaxKeyLength` to calculate the maximum key length for mappings, resolving potential issues with shorter, incorrect matches.</PackageReleaseNotes>
+    <PackageReleaseNotes>Added 177 new character mappings.</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <Title>Transliterate Library</Title>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/playfulsparkle/TransliterateLibrary</RepositoryUrl>
     <PackageProjectUrl>https://github.com/playfulsparkle/TransliterateLibrary</PackageProjectUrl>
-	<VersionPrefix>0.0.14</VersionPrefix>
+	<VersionPrefix>0.0.15</VersionPrefix>
     <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
     <FileVersion>$(VersionPrefix)</FileVersion>
   </PropertyGroup>
