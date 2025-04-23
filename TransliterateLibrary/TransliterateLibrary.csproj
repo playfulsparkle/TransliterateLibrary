@@ -10,7 +10,7 @@
     <Description>Transliterate is a utility library designed to seamlessly convert accented characters into their ASCII equivalents.</Description>
     <Copyright>2025</Copyright>
     <PackageTags>ascii diacritics accent letter alphabet remove replace playfulsparkle visualstudio extension</PackageTags>
-    <PackageReleaseNotes>Added 177 new character mappings.</PackageReleaseNotes>
+    <PackageReleaseNotes>Mappings Optimization and improved Decompose performance</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <Title>Transliterate Library</Title>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -37,6 +37,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
     <None Include="D:\Projektek\PlayfulSparkle\GitHub\TransliterateLibrary\.editorconfig" />
   </ItemGroup>
 
