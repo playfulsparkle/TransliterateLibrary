@@ -62,11 +62,11 @@ The transliterated and normalized string.
 **Example:**
 
 ```csharp
-string input = "Some text with 😊 and complex characters!";
+string input = "Some text with 🙂 and complex characters!";
 
-var result = Transliterate.Decompose(input, Transliterate.Normalization.Decompose);
+string result = Transliterate.Decompose(input, Transliterate.Normalization.Decompose);
 
-Console.WriteLine(result);
+Console.WriteLine(result); // Result: Some text with slightly smiling face and complex characters!
 ```
 
 ### DecomposeAsync
@@ -100,11 +100,11 @@ A `Task<string>` representing the asynchronous operation, containing the transli
 **Example:**
 
 ```csharp
-string input = "Another text with 😊 and more complex characters!";
+string input = "Some text with 🙂 and complex characters!";
 
-var result = await Transliterate.DecomposeAsync(input, Transliterate.Normalization.Compose);
+string result = await Transliterate.DecomposeAsync(input, Transliterate.Normalization.Decompose);
 
-Console.WriteLine(result);
+Console.WriteLine(result); // Result: Some text with slightly smiling face and complex characters!
 ```
 
 ---
@@ -116,6 +116,11 @@ Console.WriteLine(result);
 ---
 
 ## Release Notes
+
+### 0.1.0
+
+* **Mappings Optimization**: Reworked default and emoji mappings to use `int[]` arrays of Unicode code points as dictionary keys instead of string sequences (e.g., `"U+XXXX"`). This significantly improves the speed and efficiency of lookup operations during transliteration.
+* **Decompose Performance**: Refactored the `Decompose` method to use a new fast-path sequence matcher and a more efficient fallback for surrogate-aware single-character replacement. This results in considerably faster processing of text with complex mappings and Unicode sequences.
 
 ### 0.0.15
 

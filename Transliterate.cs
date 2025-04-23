@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -86,9 +87,6 @@ namespace PlayfulSparkle
         /// <param name="customMapping">An optional dictionary containing custom character or sequence mappings to be applied before the default mappings.
         /// The keys of this dictionary should be Unicode character sequences (as strings), and the values should be their replacement strings.</param>
         /// <returns>The transliterated and normalized string.</returns>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown if the provided <paramref name="normalization"/> value is not a valid member of the <see cref="Normalization"/> enum.</exception>
-        /// <exception cref="ArgumentException">Thrown if the input text is null or empty, or if it contains invalid Unicode characters.</exception>
-        /// <exception cref="OperationCanceledException">Thrown if the operation is canceled via the cancellation token.</exception>
         public static string Decompose(
             string text,
             Normalization normalization,
@@ -124,106 +122,184 @@ namespace PlayfulSparkle
                     break;
             }
 
-            int maxKeyLength = 0;
-
-            if (useDefaultMapping)
-            {
-                maxKeyLength = Math.Max(emojiMappingsMaxKeyLength, defaultMappingsMaxKeyLength);
-            }
-
-            if (customMapping != null)
-            {
-                int customMax = 0;
-                foreach (string key in customMapping.Keys)
-                {
-                    if (key.Length > customMax)
-                    {
-                        customMax = key.Length;
-                    }
-                }
-                maxKeyLength = Math.Max(maxKeyLength, customMax);
-            }
-
+            // If no mappings are used, just normalize and return
             if (!useDefaultMapping && customMapping == null)
             {
                 return NormalizeText(text, normalizationForm);
             }
 
-            // Validate user-provided custom mapping before using it.
+            // Validate user-provided custom mapping
             if (!ValidateMappingEntries(customMapping))
             {
                 throw new ArgumentOutOfRangeException(nameof(customMapping), "Custom mapping contains invalid entries.");
             }
 
-            // First pass - handle both emoji sequences and complex character mappings
-            StringBuilder firstPassResult = new StringBuilder(text.Length);
+            // Calculate the maximum key length for sequence matching
+            int maxKeyLength = GetCustomMappingMaxKegLength(useDefaultMapping, customMapping);
+
+
+            StringBuilder result = new StringBuilder(text.Length);
 
             int idx = 0;
 
             while (idx < text.Length)
             {
-                bool found = false;
-
-                int currentMaxPossible = Math.Min(maxKeyLength, text.Length - idx);
-
-                for (int len = currentMaxPossible; len > 0 && !found; len--)
+                // Try to match multi-character sequences first, from longest to shortest
+                if (TryMatchSequence(text, idx, maxKeyLength, useDefaultMapping, customMapping, out string replacement, out int matchLength))
                 {
-                    if (idx + len <= text.Length)
-                    {
-                        string candidateSequence = text.Substring(idx, len);
+                    result.Append(replacement);
 
-                        // Check custom mappings first
-                        if (customMapping != null && customMapping.TryGetValue(candidateSequence, out string customMappingReplacement))
-                        {
-                            firstPassResult.Append(customMappingReplacement);
-                            idx += len;
-                            found = true;
-                        }
-                        else if (useDefaultMapping && emojiUnicodeMappings.TryGetValue(candidateSequence, out string emojiReplacement))
-                        {
-                            firstPassResult.Append(emojiReplacement);
-                            idx += len;
-                            found = true;
-                        }
-                        else if (useDefaultMapping && defaultUnicodeMappings.TryGetValue(candidateSequence, out string mappingReplacement))
-                        {
-                            firstPassResult.Append(mappingReplacement);
-                            idx += len;
-                            found = true;
-                        }
-                    }
+                    idx += matchLength;
+
+                    continue;
                 }
 
-                // If no match was found, process as a single character
-                if (!found)
+                // No multi-character sequence matched, process as single character
+                string charReplacement = GetCharacterReplacement(text, idx, useDefaultMapping);
+
+                result.Append(charReplacement);
+
+                // Move past this character (handle surrogate pairs)
+                idx += char.IsHighSurrogate(text[idx]) &&
+                    idx + 1 < text.Length &&
+                    char.IsLowSurrogate(text[idx + 1]) ? 2 : 1;
+            }
+
+            return NormalizeText(result.ToString(), normalizationForm);
+        }
+
+        /// <summary>
+        /// Attempts to find the longest possible replacement match for a sequence of characters
+        /// starting at the given index in the input string, considering custom and default mappings.
+        /// </summary>
+        /// <param name="text">The input string to search within.</param>
+        /// <param name="index">The zero-based index in the <paramref name="text"/> where the search for a match begins.</param>
+        /// <param name="maxKeyLength">The maximum possible length of a key in any of the mappings being considered. This helps optimize the search.</param>
+        /// <param name="useDefaultMapping">A boolean value indicating whether to include the default emoji and standard mappings in the search.</param>
+        /// <param name="customMapping">An optional dictionary containing custom string mappings. These mappings are checked first and take priority over default mappings.</param>
+        /// <param name="replacement">When this method returns <c>true</c>, contains the replacement string found for the matched sequence; otherwise, the default value for the type (<c>null</c>).</param>
+        /// <param name="matchLength">When this method returns <c>true</c>, contains the length of the matched sequence in the input string; otherwise, <c>0</c>.</param>
+        /// <returns>
+        /// <c>true</c> if a matching sequence is found in either the custom or default mappings;
+        /// otherwise, <c>false</c>.
+        /// </returns>
+        private static bool TryMatchSequence(
+            string text,
+            int index,
+            int maxKeyLength,
+            bool useDefaultMapping,
+            Dictionary<string, string> customMapping,
+            out string replacement,
+            out int matchLength)
+        {
+            // Determine the maximum possible length for a candidate sequence starting at the current index.
+            int maxPossibleLength = Math.Min(maxKeyLength, text.Length - index);
+
+            // Ensure that the longest possible match is found first.
+            for (int len = maxPossibleLength; len > 0; len--)
+            {
+                // Extract the candidate sequence from the input string at the current index with the current length.
+                string candidateSequence = text.Substring(index, len);
+
+                // Check custom mappings first. Custom mappings have higher priority.
+                if (customMapping != null && customMapping.TryGetValue(candidateSequence, out replacement))
                 {
-                    char chr = text[idx];
+                    // If a match is found in custom mappings, set the match length and return true.
+                    matchLength = len;
 
-                    string charStr = chr.ToString();
+                    return true;
+                }
 
-                    string unicodeKey = $"U+{(int)chr:X4}";
+                // If no match was found in custom mappings, and default mappings are enabled, check them.
+                if (useDefaultMapping)
+                {
+                    // Check in the emoji unicode mappings dictionary (assuming emojiUnicodeMappings is a Dictionary<string, string>)
+                    if (emojiUnicodeMappings.TryGetValue(candidateSequence, out replacement))
+                    {
+                        // If a match is found in emoji mappings, set the match length and return true.
+                        matchLength = len;
 
-                    // Try to find in Emoji dictionary by Unicode notation
-                    if (useDefaultMapping && Emoji.chars.TryGetValue(unicodeKey, out string emojiReplacement)) // Assuming Emoji.chars is accessible
-                    {
-                        firstPassResult.Append(emojiReplacement);
-                    }
-                    // Try to find in DefaultMappings dictionary by Unicode notation
-                    else if (useDefaultMapping && DefaultMappings.chars.TryGetValue(unicodeKey, out string mappingReplacement)) // Assuming DefaultMappings.chars is accessible
-                    {
-                        firstPassResult.Append(mappingReplacement);
-                    }
-                    else
-                    {
-                        // If no match, add the character as is
-                        firstPassResult.Append(chr);
+                        return true;
                     }
 
-                    idx++;
+                    // Check in the default standard unicode mappings dictionary (assuming defaultUnicodeMappings is a Dictionary<string, string>)
+                    if (defaultUnicodeMappings.TryGetValue(candidateSequence, out replacement))
+                    {
+                        // If a match is found in default mappings, set the match length and return true.
+                        matchLength = len;
+
+                        return true;
+                    }
                 }
             }
 
-            return NormalizeText(firstPassResult.ToString(), normalizationForm);
+            // If the loop completes without finding any match, set output parameters to default values and return false.
+            replacement = null;
+
+            matchLength = 0;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Gets the replacement string for a single character or a surrogate pair at the specified index
+        /// within the input string, based on default emoji and standard mappings.
+        /// </summary>
+        /// <param name="text">The input string containing the character to replace.</param>
+        /// <param name="index">The zero-based index of the character (or the first character of a surrogate pair) within the string.</param>
+        /// <param name="useDefaultMapping">A boolean value indicating whether to check the default emoji and standard mappings for a replacement.</param>
+        /// <returns>
+        /// The replacement string found in the default mappings if <paramref name="useDefaultMapping"/> is true
+        /// and a match is found for the character/code point at the given index.
+        /// Returns the original character(s) at the index as a string if no replacement is found or if
+        /// <paramref name="useDefaultMapping"/> is false.
+        /// </returns>
+        private static string GetCharacterReplacement(string text, int index, bool useDefaultMapping)
+        {
+            char currentChar = text[index];
+
+            // Handle both BMP and surrogate pair characters
+            int codePoint;
+
+            bool isSurrogatePair = char.IsHighSurrogate(currentChar) &&
+                                  index + 1 < text.Length &&
+                                  char.IsLowSurrogate(text[index + 1]);
+
+            if (isSurrogatePair)
+            {
+                codePoint = char.ConvertToUtf32(currentChar, text[index + 1]);
+            }
+            else
+            {
+                codePoint = currentChar;
+            }
+
+            // If default mappings are enabled, check them
+            if (useDefaultMapping)
+            {
+                // Check in emoji dictionary
+                foreach (KeyValuePair<int[], string> entry in Emoji.chars)
+                {
+                    if (entry.Key.Length == 1 && entry.Key[0] == codePoint)
+                    {
+                        return entry.Value;
+                    }
+                }
+
+                // Check in default mappings dictionary
+                foreach (KeyValuePair<int[], string> entry in DefaultMappings.chars)
+                {
+                    if (entry.Key.Length == 1 && entry.Key[0] == codePoint)
+                    {
+                        return entry.Value;
+                    }
+                }
+            }
+
+            // If no replacement found, return the original character
+            return isSurrogatePair
+                ? char.ConvertFromUtf32(codePoint)
+                : currentChar.ToString();
         }
 
         /// <summary>
@@ -255,11 +331,14 @@ namespace PlayfulSparkle
         }
 
         /// <summary>
-        /// Gets the maximum unicodeNotationLength of the keys in a given dictionary.
+        /// Calculates the maximum length among the string keys in a given dictionary.
         /// </summary>
-        /// <param name="dict">The dictionary to examine.</param>
-        /// <returns>The maximum unicodeNotationLength of the keys in the dictionary.</returns>
-        internal static int GetMaxKeyLength(Dictionary<string, string> dict)
+        /// <param name="dict">The dictionary whose string keys will be examined to find the maximum length.</param>
+        /// <returns>
+        /// The maximum length of any key in the dictionary.
+        /// Returns 0 if the dictionary is null or empty.
+        /// </returns>
+        internal static int GetMaxKeyLength(Dictionary<string, string> dict = null)
         {
             if (dict == null || dict.Count == 0)
             {
@@ -277,6 +356,36 @@ namespace PlayfulSparkle
             }
 
             return maxLength;
+        }
+
+        /// <summary>
+        /// Calculates the maximum key length considering default mappings and an optional custom mapping.
+        /// </summary>
+        /// <param name="useDefaultMapping">A boolean value indicating whether to include the maximum key lengths from default emoji and standard mappings in the calculation.</param>
+        /// <param name="customMapping">An optional dictionary containing custom string mappings. The maximum length of keys in this dictionary will be considered if the dictionary is not null or empty.</param>
+        /// <returns>The maximum key length found among the considered mappings (default and/or custom).</returns>
+        private static int GetCustomMappingMaxKegLength(bool useDefaultMapping, Dictionary<string, string> customMapping = null)
+        {
+            int maxKeyLength = useDefaultMapping
+                ? Math.Max(emojiMappingsMaxKeyLength, defaultMappingsMaxKeyLength)
+                : 0;
+
+            if (customMapping != null && customMapping.Count > 0)
+            {
+                int customMax = 0;
+
+                foreach (string key in customMapping.Keys)
+                {
+                    if (key.Length > customMax)
+                    {
+                        customMax = key.Length;
+                    }
+                }
+
+                maxKeyLength = Math.Max(maxKeyLength, customMax);
+            }
+
+            return maxKeyLength;
         }
 
         /// <summary>
@@ -304,32 +413,6 @@ namespace PlayfulSparkle
             }
 
             return true;
-        }
-
-        /// <summary>
-        /// Preprocesses a dictionary by converting Unicode notation (e.g., "U+XXXX" or "U+XXXX U+YYYY") in the keys
-        /// to their corresponding actual Unicode characters.
-        /// </summary>
-        /// <param name="dict">The text dictionary where keys are in Unicode notation.</param>
-        /// <returns>A new dictionary where the keys are the actual Unicode characters represented by the notation in the text dictionary.</returns>
-        internal static Dictionary<string, string> PrepareDictionary(Dictionary<string, string> dict)
-        {
-            if (dict == null || dict.Count == 0)
-            {
-                return new Dictionary<string, string>(0);
-            }
-
-            Dictionary<string, string> processedDictionary = new Dictionary<string, string>();
-
-            foreach (KeyValuePair<string, string> unicodeMappingEntry in dict)
-            {
-                // Convert from "U+XXXX U+YYYY" format to actual Unicode characters
-                string unicodeCharSequence = UnicodeNotationToCharacters(unicodeMappingEntry.Key);
-
-                processedDictionary[unicodeCharSequence] = unicodeMappingEntry.Value;
-            }
-
-            return processedDictionary;
         }
 
         /// <summary>
@@ -407,80 +490,72 @@ namespace PlayfulSparkle
         }
 
         /// <summary>
-        /// Converts a string containing Unicode notations (e.g., "U+1F642 U+200D U+2194 U+FE0F")
-        /// to a string of the corresponding actual Unicode characters.
+        /// Converts a dictionary where keys are arrays of integer Unicode code points
+        /// to a new dictionary where keys are the corresponding actual Unicode characters.
+        /// This method handles single and multi-code point characters and validates code points.
         /// </summary>
-        /// <param name="text">The string containing Unicode notations, where each notation starts with "U+" followed by the hexadecimal Unicode code point,
-        /// and multiple notations can be separated by spaces.</param>
-        /// <returns>A string containing the Unicode characters represented by the text notation.</returns>
-        internal static string UnicodeNotationToCharacters(string text)
+        /// <param name="dict">The input dictionary where keys are arrays of integer Unicode code points and values are strings.</param>
+        /// <returns>A new dictionary where the keys are the actual Unicode characters represented by the code points. Returns an empty dictionary if the input is null or empty, or if no valid keys can be generated.</returns>
+        internal static Dictionary<string, string> PrepareDictionary(Dictionary<int[], string> dict)
         {
-            if (string.IsNullOrEmpty(text))
+            // Return an empty dictionary immediately if the input is null or empty
+            if (dict == null || dict.Count == 0)
             {
-                return string.Empty;
+                return new Dictionary<string, string>(0);
             }
 
-            StringBuilder unicodeStringBuilder = new StringBuilder(text.Length / 3); // Estimate capacity
+            // Initialize the result dictionary with a capacity based on the input dictionary count
+            Dictionary<string, string> result = new Dictionary<string, string>(dict.Count);
 
-            int currentPosition = 0;
-
-            int unicodeNotationLength = text.Length;
-
-            while (currentPosition < unicodeNotationLength)
+            // Iterate through each key-value pair in the input dictionary
+            foreach (var entry in dict)
             {
-                // Find next "U+" marker
-                int unicodeMarkerPosition = text.IndexOf("U+", currentPosition, StringComparison.Ordinal);
+                int[] codePoints = entry.Key;
 
-                if (unicodeMarkerPosition == -1)
+                // Skip the entry if the code point array key is null or empty
+                if (codePoints == null || codePoints.Length == 0)
                 {
-                    break;
+                    continue;
                 }
 
-                // Move past "U+"
-                int unicodeHexStartPosition = unicodeMarkerPosition + 2;
+                StringBuilder sb = new StringBuilder(codePoints.Length);
 
-                if (unicodeHexStartPosition >= unicodeNotationLength)
+                // Convert each integer code point to its corresponding Unicode character(s)
+                foreach (int codePoint in codePoints)
                 {
-                    break;
-                }
-
-                // Find end of hex value (space or end of string)
-                int unicodeHexEndPosition = text.IndexOf(' ', unicodeHexStartPosition);
-
-                if (unicodeHexEndPosition == -1)
-                {
-                    unicodeHexEndPosition = unicodeNotationLength;
-                }
-
-                // Extract and parse hex value
-                if (unicodeHexEndPosition > unicodeHexStartPosition && unicodeHexEndPosition - unicodeHexStartPosition <= 8) // Max valid Unicode is U+10FFFF (6 chars + "U+")
-                {
-                    try
+                    // Validate if the code point is within the valid Unicode range (U+0000 to U+10FFFF)
+                    if (codePoint >= 0 && codePoint <= 0x10FFFF)
                     {
-                        string unicodeHexValue = text.Substring(unicodeHexStartPosition, unicodeHexEndPosition - unicodeHexStartPosition);
-
-                        // Try to parse the hex value safely
-                        if (int.TryParse(unicodeHexValue, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int unicodeCodePoint))
+                        try
                         {
-                            // Validate Unicode range (U+0000 to U+10FFFF)
-                            if (unicodeCodePoint >= 0 && unicodeCodePoint <= 0x10FFFF)
-                            {
-                                // Convert to UTF-16 character(s)
-                                unicodeStringBuilder.Append(char.ConvertFromUtf32(unicodeCodePoint));
-                            }
+                            // Convert the integer code point to a string representation of the character(s)
+                            // char.ConvertFromUtf32 handles surrogate pairs for characters outside the Basic Multilingual Plane (BMP)
+                            sb.Append(char.ConvertFromUtf32(codePoint));
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            // Catch potential exceptions if ConvertFromUtf32 encounters an invalid sequence or value
+                            // Although the range check is done, this adds robustness.
+                            // If an invalid code point is encountered, skip it and continue with the next.
+                            // This might happen for values within the range but not valid UTF-32 code points (e.g., surrogates outside valid pairs).
                         }
                     }
-                    catch (Exception ex) when (ex is ArgumentOutOfRangeException || ex is FormatException)
-                    {
-                        return string.Empty; // Invalid hex value
-                    }
+                    // Code points outside the valid Unicode range are ignored
                 }
 
-                // Move to next position after currentCharacter code point
-                currentPosition = unicodeHexEndPosition + 1;
+                string unicodeCharSequence = sb.ToString();
+
+                if (!string.IsNullOrEmpty(unicodeCharSequence))
+                {
+                    if (!result.ContainsKey(unicodeCharSequence))
+                    {
+                        result.Add(unicodeCharSequence, entry.Value);
+                    }
+                }
+                // Entries with null, empty, or only invalid code points will not be added to the result dictionary
             }
 
-            return unicodeStringBuilder.ToString();
+            return result;
         }
 
         /// <summary>

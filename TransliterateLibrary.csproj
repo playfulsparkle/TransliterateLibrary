@@ -16,7 +16,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/playfulsparkle/TransliterateLibrary</RepositoryUrl>
     <PackageProjectUrl>https://github.com/playfulsparkle/TransliterateLibrary</PackageProjectUrl>
-	<VersionPrefix>0.0.15</VersionPrefix>
+	<VersionPrefix>0.1.0</VersionPrefix>
     <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
     <FileVersion>$(VersionPrefix)</FileVersion>
   </PropertyGroup>
