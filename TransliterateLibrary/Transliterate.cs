@@ -258,12 +258,11 @@ namespace PlayfulSparkle
         {
             char currentChar = text[index];
 
-            // Handle both BMP and surrogate pair characters
-            int codePoint;
-
             bool isSurrogatePair = char.IsHighSurrogate(currentChar) &&
-                                  index + 1 < text.Length &&
-                                  char.IsLowSurrogate(text[index + 1]);
+                                   index + 1 < text.Length &&
+                                   char.IsLowSurrogate(text[index + 1]);
+
+            int codePoint;
 
             if (isSurrogatePair)
             {
@@ -274,32 +273,21 @@ namespace PlayfulSparkle
                 codePoint = currentChar;
             }
 
-            // If default mappings are enabled, check them
+            string charStr = char.ConvertFromUtf32(codePoint);
+
             if (useDefaultMapping)
             {
-                // Check in emoji dictionary
-                foreach (KeyValuePair<int[], string> entry in Emoji.chars)
+                if (emojiUnicodeMappings.TryGetValue(charStr, out string replacement))
                 {
-                    if (entry.Key.Length == 1 && entry.Key[0] == codePoint)
-                    {
-                        return entry.Value;
-                    }
+                    return replacement;
                 }
-
-                // Check in default mappings dictionary
-                foreach (KeyValuePair<int[], string> entry in DefaultMappings.chars)
+                if (defaultUnicodeMappings.TryGetValue(charStr, out replacement))
                 {
-                    if (entry.Key.Length == 1 && entry.Key[0] == codePoint)
-                    {
-                        return entry.Value;
-                    }
+                    return replacement;
                 }
             }
 
-            // If no replacement found, return the original character
-            return isSurrogatePair
-                ? char.ConvertFromUtf32(codePoint)
-                : currentChar.ToString();
+            return charStr;
         }
 
         /// <summary>
