@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PlayfulSparkle;
 
@@ -12,7 +11,7 @@ namespace TransliterateLibrary.UnitTest
         [TestMethod]
         public void Test_Emoji_Dataset()
         {
-           Dictionary<string, string> emojiUnicodeMappings = Transliterate.PrepareDictionary(Emoji.chars);
+            Dictionary<string, string> emojiUnicodeMappings = Transliterate.PrepareDictionary(Emoji.chars);
 
             foreach (KeyValuePair<string, string> entry in emojiUnicodeMappings)
             {
