@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -31,13 +30,13 @@ namespace PlayfulSparkle
         /// Stores the maximum length of keys in the <see cref="emojiUnicodeMappings"/> dictionary.
         /// This value is calculated during the class's static initialization to optimize lookup operations.
         /// </summary>
-        internal static readonly int emojiMappingsMaxKeyLength;
+        internal static readonly int emojiMappingsMaxKeyLength = 0;
 
         /// <summary>
         /// Stores the maximum length of keys in the <see cref="defaultUnicodeMappings"/> dictionary.
         /// This value is calculated during the class's static initialization to optimize lookup operations.
         /// </summary>
-        internal static readonly int defaultMappingsMaxKeyLength;
+        internal static readonly int defaultMappingsMaxKeyLength = 0;
 
         /// <summary>
         /// Defines the different Unicode normalization forms that can be applied to a string.
@@ -104,13 +103,10 @@ namespace PlayfulSparkle
                 throw new ArgumentOutOfRangeException(nameof(text), "Input string contains invalid Unicode characters.");
             }
 
-            NormalizationForm normalizationForm = NormalizationForm.FormD;
+            NormalizationForm normalizationForm;
 
             switch (normalization)
             {
-                case Normalization.Decompose:
-                    normalizationForm = NormalizationForm.FormD;
-                    break;
                 case Normalization.Compose:
                     normalizationForm = NormalizationForm.FormC;
                     break;
@@ -119,6 +115,10 @@ namespace PlayfulSparkle
                     break;
                 case Normalization.CompatibilityDecompose:
                     normalizationForm = NormalizationForm.FormKD;
+                    break;
+                case Normalization.Decompose:
+                default:
+                    normalizationForm = NormalizationForm.FormD;
                     break;
             }
 
@@ -138,7 +138,7 @@ namespace PlayfulSparkle
             int maxKeyLength = GetCustomMappingMaxKegLength(useDefaultMapping, customMapping);
 
 
-            StringBuilder result = new StringBuilder(text.Length);
+            StringBuilder result = new StringBuilder();
 
             int idx = 0;
 
@@ -258,30 +258,27 @@ namespace PlayfulSparkle
         {
             char currentChar = text[index];
 
-            bool isSurrogatePair = char.IsHighSurrogate(currentChar) &&
-                                   index + 1 < text.Length &&
-                                   char.IsLowSurrogate(text[index + 1]);
+            int codePoint = currentChar;
 
-            int codePoint;
-
-            if (isSurrogatePair)
+            if (
+                char.IsHighSurrogate(currentChar) &&
+                index + 1 < text.Length &&
+                char.IsLowSurrogate(text[index + 1])
+            ) // Is surrogate pair
             {
                 codePoint = char.ConvertToUtf32(currentChar, text[index + 1]);
-            }
-            else
-            {
-                codePoint = currentChar;
             }
 
             string charStr = char.ConvertFromUtf32(codePoint);
 
             if (useDefaultMapping)
             {
-                if (emojiUnicodeMappings.TryGetValue(charStr, out string replacement))
-                {
-                    return replacement;
-                }
-                if (defaultUnicodeMappings.TryGetValue(charStr, out replacement))
+                string replacement;
+
+                if (
+                    emojiUnicodeMappings.TryGetValue(charStr, out replacement) ||
+                    defaultUnicodeMappings.TryGetValue(charStr, out replacement)
+                )
                 {
                     return replacement;
                 }
