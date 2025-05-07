@@ -1,0 +1,87 @@
+name: 🐞 Bug Report
+description: Create a report to help us improve the Transliterate Library
+title: "Bug Report Title"
+labels: []
+assignees:
+  - zsoltoroszlany82
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the details below to help us understand and fix the issue.
+
+  - type: textarea
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: e.g. The Decompose method throws an ArgumentException with valid input.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce
+      description: Provide the steps to reproduce the behavior. Include code snippets if possible.
+      placeholder: |
+        1. Call the `Decompose` method with these parameters: `...`
+        2. Use this input string: `...`
+        3. Observe the error or unexpected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: The method should have returned the transliterated string without an error.
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Error Logs or Messages
+      description: Paste any relevant error messages, stack traces, or logs here.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Screenshots or Video
+      description: If applicable, add screenshots or a video to help explain your problem.
+    validations:
+      required: false
+
+  - type: input
+    attributes:
+      label: Transliterate Library Version
+      description: What version of the library are you using?
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: .NET Environment Details
+      description: Provide details about your .NET environment (e.g., .NET Core 3.1, .NET 5, .NET 6, .NET 7, .NET 8, .NET Standard 2.0).
+      placeholder: e.g. .NET 8.0
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Development Environment Details
+      description: Provide details about your operating system, IDE (e.g., Visual Studio 2022, VS Code), and any other relevant environment information.
+      placeholder: |
+        - OS: Windows 11
+        - IDE: Visual Studio 2022 (Version ...)
+        - Other relevant libraries/frameworks: ...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here.
+    validations:
+      required: false
